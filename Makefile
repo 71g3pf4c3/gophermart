@@ -1,4 +1,4 @@
-.PHONY: build test cover run deps compose-up compose-down
+.PHONY: build test cover run deps compose-up compose-down mocks
 
 build:
 	go build -o bin/gophermart ./cmd/gophermart
@@ -21,3 +21,7 @@ compose-up:
 
 compose-down:
 	docker compose down --remove-orphans
+
+mocks:
+	go install go.uber.org/mock/mockgen@v0.6.0
+	PATH="$$PATH:$$(go env GOPATH)/bin" go generate ./internal/mocks
