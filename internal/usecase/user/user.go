@@ -27,32 +27,37 @@ func New(r repo.UserRepo, j *jwt.Manager) *UseCase {
 }
 
 // Register -.
-func (uc *UseCase) Register(ctx context.Context, username, password string) (entity.User, error) {
+func (uc *UseCase) Register(ctx context.Context, login, password string) (entity.User, string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return entity.User{}, fmt.Errorf("UserUseCase - Register - bcrypt.GenerateFromPassword: %w", err)
+		return entity.User{}, "", fmt.Errorf("UserUseCase - Register - bcrypt.GenerateFromPassword: %w", err)
 	}
 
 	now := time.Now().UTC()
 
 	user := entity.User{
 		ID:           uuid.New().String(),
-		Username:     username,
+		Login:        login,
 		PasswordHash: string(hash),
 		CreatedAt:    now,
 	}
 
 	err = uc.repo.CreateUser(ctx, &user)
 	if err != nil {
-		return entity.User{}, fmt.Errorf("UserUseCase - Register - uc.repo.CreateUser: %w", err)
+		return entity.User{}, "", fmt.Errorf("UserUseCase - Register - uc.repo.CreateUser: %w", err)
 	}
 
-	return user, nil
+	token, err := uc.jwt.GenerateToken(user.ID)
+	if err != nil {
+		return entity.User{}, "", fmt.Errorf("UserUseCase - Register - GenerateToken: %w", err)
+	}
+
+	return user, token, nil
 }
 
 // Login -.
-func (uc *UseCase) Login(ctx context.Context, username, password string) (string, error) {
-	user, err := uc.repo.GetByUsername(ctx, username)
+func (uc *UseCase) Login(ctx context.Context, login, password string) (string, error) {
+	user, err := uc.repo.GetByLogin(ctx, login)
 	if err != nil {
 		return "", entity.ErrInvalidCredentials
 	}

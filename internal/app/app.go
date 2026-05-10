@@ -12,6 +12,8 @@ import (
 	"github.com/71g3pf4c3/gophermart/internal/controller/restapi"
 	"github.com/71g3pf4c3/gophermart/internal/repo/postgres"
 	"github.com/71g3pf4c3/gophermart/internal/usecase/accrual"
+	"github.com/71g3pf4c3/gophermart/internal/usecase/balance"
+	ucorder "github.com/71g3pf4c3/gophermart/internal/usecase/order"
 	"github.com/71g3pf4c3/gophermart/internal/usecase/user"
 	"github.com/71g3pf4c3/gophermart/pkg/httpserver"
 	"github.com/71g3pf4c3/gophermart/pkg/jwt"
@@ -23,9 +25,9 @@ type servers struct {
 	http *httpserver.Server
 }
 
-func initServers(cfg *config.Config, jwtManager *jwt.Manager, l logger.Interface, userService *user.UseCase) servers {
+func initServers(cfg *config.Config, jwtManager *jwt.Manager, l logger.Interface, userService *user.UseCase, orderService *ucorder.UseCase, balanceService *balance.UseCase) servers {
 	httpServer := httpserver.New(l, httpserver.Port(cfg.HTTP.Port), httpserver.Prefork(cfg.HTTP.UsePreforkMode))
-	restapi.NewRouter(httpServer.App, jwtManager, l, userService)
+	restapi.NewRouter(httpServer.App, jwtManager, l, userService, orderService, balanceService)
 
 	return servers{http: httpServer}
 }
@@ -74,14 +76,20 @@ func Run(cfg *config.Config) {
 
 	jwtManager := jwt.New(cfg.JWTSecret, cfg.JWT.TokenExpiry)
 	userRepo := postgres.NewUserRepo(pg)
+	orderRepo := postgres.NewOrderRepository(pg)
+	balanceRepo := postgres.NewBalanceRepository(pg)
+
 	userService := user.New(userRepo, jwtManager)
+	orderService := ucorder.New(orderRepo)
+	balanceService := balance.New(balanceRepo)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	accrualProcessor := accrual.New(cfg.AccrualSystemAddress, cfg.Accrual.PollInterval, l)
+	accrualProcessor := accrual.New(cfg.AccrualSystemAddress, cfg.Accrual.PollInterval, l, orderRepo)
 	go accrualProcessor.Run(ctx)
 
-	s := initServers(cfg, jwtManager, l, userService)
+	s := initServers(cfg, jwtManager, l, userService, orderService, balanceService)
 	s.startServers()
 	s.waitForShutdown(cancel, l)
 }

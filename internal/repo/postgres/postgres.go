@@ -26,8 +26,8 @@ func NewUserRepo(pg *postgres.Postgres) *UserRepo {
 func (r *UserRepo) CreateUser(ctx context.Context, user *entity.User) error {
 	sql, args, err := r.Builder.
 		Insert("users").
-		Columns("id, username, password_hash, created_at").
-		Values(user.ID, user.Username, user.PasswordHash, user.CreatedAt).
+		Columns("id, login, password_hash, created_at").
+		Values(user.ID, user.Login, user.PasswordHash, user.CreatedAt).
 		ToSql()
 	if err != nil {
 		return fmt.Errorf("UserRepo - Store - r.Builder: %w", err)
@@ -51,13 +51,13 @@ func (r *UserRepo) GetByID(ctx context.Context, id string) (entity.User, error) 
 	return r.getUser(ctx, "id", id)
 }
 
-func (r *UserRepo) GetByUsername(ctx context.Context, username string) (entity.User, error) {
-	return r.getUser(ctx, "username", username)
+func (r *UserRepo) GetByLogin(ctx context.Context, login string) (entity.User, error) {
+	return r.getUser(ctx, "login", login)
 }
 
 func (r *UserRepo) getUser(ctx context.Context, column, value string) (entity.User, error) {
 	sql, args, err := r.Builder.
-		Select("id, username, password_hash, created_at").
+		Select("id, login, password_hash, created_at").
 		From("users").
 		Where(sq.Eq{column: value}).
 		ToSql()
@@ -67,7 +67,7 @@ func (r *UserRepo) getUser(ctx context.Context, column, value string) (entity.Us
 
 	var user entity.User
 	err = r.Pool.QueryRow(ctx, sql, args...).
-		Scan(&user.ID, &user.Username, &user.PasswordHash, &user.CreatedAt)
+		Scan(&user.ID, &user.Login, &user.PasswordHash, &user.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return entity.User{}, entity.ErrUserNotFound

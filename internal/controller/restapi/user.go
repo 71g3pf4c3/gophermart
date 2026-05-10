@@ -10,8 +10,8 @@ import (
 )
 
 type User interface {
-	Register(ctx context.Context, username, password string) (entity.User, error)
-	Login(ctx context.Context, username, password string) (string, error)
+	Register(ctx context.Context, login, password string) (entity.User, string, error)
+	Login(ctx context.Context, login, password string) (string, error)
 }
 
 type UserHandler struct {
@@ -19,7 +19,7 @@ type UserHandler struct {
 }
 
 type userAuthRequest struct {
-	Username string `json:"username"`
+	Login    string `json:"login"`
 	Password string `json:"password"`
 }
 
@@ -33,12 +33,12 @@ func (h *UserHandler) Register(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
 
-	req.Username = strings.TrimSpace(req.Username)
-	if req.Username == "" || req.Password == "" {
+	req.Login = strings.TrimSpace(req.Login)
+	if req.Login == "" || req.Password == "" {
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
 
-	_, err := h.u.Register(c.UserContext(), req.Username, req.Password)
+	_, token, err := h.u.Register(c.UserContext(), req.Login, req.Password)
 	if err != nil {
 		switch {
 		case errors.Is(err, entity.ErrUserAlreadyExists):
@@ -46,11 +46,6 @@ func (h *UserHandler) Register(c *fiber.Ctx) error {
 		default:
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}
-	}
-
-	token, err := h.u.Login(c.UserContext(), req.Username, req.Password)
-	if err != nil {
-		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 
 	c.Set(fiber.HeaderAuthorization, "Bearer "+token)
@@ -64,12 +59,12 @@ func (h *UserHandler) Login(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
 
-	req.Username = strings.TrimSpace(req.Username)
-	if req.Username == "" || req.Password == "" {
+	req.Login = strings.TrimSpace(req.Login)
+	if req.Login == "" || req.Password == "" {
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
 
-	token, err := h.u.Login(c.UserContext(), req.Username, req.Password)
+	token, err := h.u.Login(c.UserContext(), req.Login, req.Password)
 	if err != nil {
 		switch {
 		case errors.Is(err, entity.ErrInvalidCredentials):

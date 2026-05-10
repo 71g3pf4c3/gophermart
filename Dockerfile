@@ -1,5 +1,5 @@
 # Step 1: Modules caching
-FROM golang:1.22-alpine AS modules
+FROM golang:1.25-alpine AS modules
 
 COPY go.mod go.sum /modules/
 
@@ -8,7 +8,7 @@ WORKDIR /modules
 RUN go mod download
 
 # Step 2: Builder
-FROM golang:1.22-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 COPY --from=modules /go/pkg /go/pkg
 COPY . /app
@@ -25,4 +25,5 @@ COPY --from=builder /app/migrations /migrations
 COPY --from=builder /bin/app /app
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
+ENV MIGRATIONS_PATH=/migrations
 CMD ["/app"]

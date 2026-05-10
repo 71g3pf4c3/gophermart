@@ -7,31 +7,35 @@ import (
 	"github.com/71g3pf4c3/gophermart/pkg/jwt"
 	"github.com/71g3pf4c3/gophermart/pkg/logger"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/compress"
 )
 
 // NewRouter configures HTTP routes for the Gophermart service.
-func NewRouter(app *fiber.App, jwtManager *jwt.Manager, l logger.Interface, userService User) {
+func NewRouter(app *fiber.App, jwtManager *jwt.Manager, l logger.Interface, userService User, orderService Order, balanceService Balance) {
 	app.Use(middleware.Logger(l))
 	app.Use(middleware.Recovery(l))
+	app.Use(compress.New(compress.Config{
+		Level: compress.LevelBestSpeed,
+	}))
 
 	app.Get("/ping", func(ctx *fiber.Ctx) error { return ctx.SendStatus(http.StatusOK) })
 	app.Get("/healthz", func(ctx *fiber.Ctx) error { return ctx.SendStatus(http.StatusOK) })
 
 	api := app.Group("/api")
 	user := api.Group("/user")
-	us := newUserHandler(userService)
-	user.Post("/register", us.Register)
-	user.Post("/login", us.Login)
 
-	authenticated := user.Group("", middleware.Auth(jwtManager))
-	authenticated.Get("/users", notImplemented)
-	authenticated.Post("/orders", notImplemented)
-	authenticated.Get("/orders", notImplemented)
-	authenticated.Get("/balance", notImplemented)
-	authenticated.Post("/balance/withdraw", notImplemented)
-	authenticated.Get("/withdrawals", notImplemented)
-}
+	uh := newUserHandler(userService)
+	user.Post("/register", uh.Register)
+	user.Post("/login", uh.Login)
 
-func notImplemented(ctx *fiber.Ctx) error {
-	return ctx.Status(http.StatusNotImplemented).JSON(fiber.Map{"error": "not implemented"})
+	auth := user.Group("", middleware.Auth(jwtManager))
+
+	oh := newOrderHandler(orderService)
+	auth.Post("/orders", oh.Upload)
+	auth.Get("/orders", oh.List)
+
+	bh := newBalanceHandler(balanceService)
+	auth.Get("/balance", bh.GetBalance)
+	auth.Post("/balance/withdraw", bh.Withdraw)
+	auth.Get("/withdrawals", bh.GetWithdrawals)
 }
